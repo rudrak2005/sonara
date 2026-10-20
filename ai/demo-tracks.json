@@ -1,0 +1,20 @@
+[
+  {
+    "id": "demo-001",
+    "title": "Night Drive",
+    "artist": "Demo Artist",
+    "album": "Demo Collection",
+    "durationMs": 180000,
+    "source": "LOCAL",
+    "audioUrl": "/music/demo/night-drive.mp3"
+  },
+  {
+    "id": "demo-002",
+    "title": "Focus Mode",
+    "artist": "Demo Artist",
+    "album": "Demo Collection",
+    "durationMs": 210000,
+    "source": "LOCAL",
+    "audioUrl": "/music/demo/focus-mode.mp3"
+  }
+]

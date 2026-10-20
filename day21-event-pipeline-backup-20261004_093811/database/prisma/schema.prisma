@@ -1,0 +1,260 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../../services/api/src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AtmosphereMode {
+  OFF
+  AUTO
+  MANUAL
+}
+
+enum DiscoveryLevel {
+  LOW
+  BALANCED
+  HIGH
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String?    @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  role         UserRole   @default(USER)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
+
+  profile             Profile?
+  preference          UserPreference?
+  sessions            Session[]
+  authSessions        AuthSession[]
+  passwordResetTokens PasswordResetToken[]
+  queueItems          QueueItem[]
+  savedMusicItems     SavedMusicItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  displayName String   @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  bio         String?
+  locale      String   @default("en-IN")
+  timezone    String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model UserPreference {
+  userId                 String         @id @map("user_id") @db.Uuid
+  autoAtmosphereEnabled  Boolean        @default(true) @map("auto_atmosphere_enabled")
+  atmosphereMode         AtmosphereMode @default(AUTO) @map("atmosphere_mode")
+  personalizationEnabled Boolean        @default(true) @map("personalization_enabled")
+  pulseEnabled           Boolean        @default(true) @map("pulse_enabled")
+  memoryEnabled          Boolean        @default(true) @map("memory_enabled")
+  discoveryLevel         DiscoveryLevel @default(BALANCED) @map("discovery_level")
+  aiAssistantEnabled     Boolean        @default(true) @map("ai_assistant_enabled")
+  reducedMotion          Boolean        @default(false) @map("reduced_motion")
+  privateSessionDefault  Boolean        @default(false) @map("private_session_default")
+  onboardingCompleted    Boolean        @default(false) @map("onboarding_completed")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String?   @map("user_id") @db.Uuid
+  startedAt      DateTime  @default(now()) @map("started_at")
+  endedAt        DateTime? @map("ended_at")
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+  privateMode    Boolean   @default(false) @map("private_mode")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items SessionItem[]
+
+  @@index([userId])
+  @@index([startedAt])
+  @@index([lastActivityAt])
+  @@map("sessions")
+}
+
+model SessionItem {
+  id        String    @id @default(uuid()) @db.Uuid
+  sessionId String    @map("session_id") @db.Uuid
+  position  Int
+  trackId   String?   @map("track_id") @db.Uuid
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  playedMs  Int       @default(0) @map("played_ms")
+  completed Boolean   @default(false)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, position])
+  @@index([sessionId])
+  @@map("session_items")
+}
+
+model AuthSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime  @default(now()) @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@map("password_reset_tokens")
+}
+
+model Artist {
+  id               String   @id @default(uuid()) @db.Uuid
+  provider         String
+  providerArtistId String   @map("provider_artist_id")
+  name             String
+  imageUrl         String?  @map("image_url")
+  metadataJson     Json?    @map("metadata_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  albums     Album[]
+  musicItems MusicItem[]
+
+  @@unique([provider, providerArtistId])
+  @@index([provider])
+  @@index([name])
+  @@map("artists")
+}
+
+model Album {
+  id              String    @id @default(uuid()) @db.Uuid
+  provider        String
+  providerAlbumId String    @map("provider_album_id")
+  artistId        String?   @map("artist_id") @db.Uuid
+  title           String
+  releaseDate     DateTime? @map("release_date")
+  artworkUrl      String?   @map("artwork_url")
+  metadataJson    Json?     @map("metadata_json")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  artist     Artist?     @relation(fields: [artistId], references: [id], onDelete: SetNull)
+  musicItems MusicItem[]
+
+  @@unique([provider, providerAlbumId])
+  @@index([provider])
+  @@index([artistId])
+  @@map("albums")
+}
+
+model MusicItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  provider          String
+  providerTrackId   String    @map("provider_track_id")
+  title             String
+  artistId          String?   @map("artist_id") @db.Uuid
+  albumId           String?   @map("album_id") @db.Uuid
+  durationMs        Int       @map("duration_ms")
+  releaseDate       DateTime? @map("release_date")
+  genreData         Json?     @map("genre_data")
+  audioFeaturesJson Json?     @map("audio_features_json")
+  artworkUrl        String?   @map("artwork_url")
+  metadataJson      Json?     @map("metadata_json")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  artist     Artist?     @relation(fields: [artistId], references: [id], onDelete: SetNull)
+  album      Album?      @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  queueItems       QueueItem[]
+  savedMusicItems  SavedMusicItem[]
+
+  @@unique([provider, providerTrackId])
+  @@index([provider])
+  @@index([artistId])
+  @@index([albumId])
+  @@index([title])
+  @@map("music_items")
+}
+
+model SavedMusicItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  musicItemId String    @map("music_item_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musicItem MusicItem @relation(fields: [musicItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, musicItemId])
+  @@index([userId, createdAt])
+  @@index([musicItemId])
+  @@map("saved_music_items")
+}
+
+model QueueItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  musicItemId String   @db.Uuid
+  position    Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musicItem MusicItem @relation(fields: [musicItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, position])
+  @@index([userId, createdAt])
+  @@map("queue_items")
+}
